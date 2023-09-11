@@ -1,6 +1,6 @@
 (ns engine.engine
   (:require [com.stuartsierra.dependency :as dep]
-            [clojure.core.async :as async :refer [>! <!]]))
+            [clojure.core.async :as async :refer [>! <! <!!]]))
 
 (defprotocol World
   (add-system [world stage system]
@@ -107,36 +107,60 @@
 (defn- can-apply-system [system graph completed]
   (every? #(contains? completed %) (dep/transitive-dependencies graph system)))
 
+(defn- find-depths
+  [systems graph]
+  (let [leaf-nodes (filter #(empty? (dep/immediate-dependencies graph %)) systems)
+        initial-nodes (zipmap leaf-nodes (repeat 0))]
+    (loop [queue (reduce conj clojure.lang.PersistentQueue/EMPTY initial-nodes)
+           result {}]
+      (if (empty? queue) result
+          (let [[node depth] (peek queue)
+                neighbours (dep/immediate-dependents graph node)
+                next-nodes (for [neighbour neighbours
+                                 :let [next-depth (+ 1 depth)]
+                                 :let [next-node [neighbour next-depth]]
+                                 :when (< (get result neighbour -1) next-depth)]
+                             next-node)]
+            (recur (reduce conj (pop queue) next-nodes) (assoc result node depth)))))))
+
+(comment (let [graph (-> (dep/graph)
+                         (dep/depend :b :a)
+                         (dep/depend :c :a)
+                         (dep/depend :d :b)
+                         (dep/depend :d :a)
+                         (dep/depend :e :c)
+                         (dep/depend :f :a)
+                         (dep/depend :f :c)
+                         (dep/depend :f :d))
+               depths (find-depths [:a :b :c :d :e :f] graph)]
+           (println (vals (group-by depths (keys depths))))))
+
+(defn- apply-system-results
+  "Takes the results of running a system and applies them to the world. "
+  [world results] world)
+
+(defn- apply-system-batch
+  "Applies a sequence of independent systems and return the resulting world."
+  [world batch]
+  (let [channel (async/chan)]
+    (doseq [system batch]
+      ;; TODO: get system results properly
+      (async/go (>! channel (system world))))
+    ;; Blocking take from the result thread
+    (<!! (async/go-loop [world world i 0]
+           (if (>= i (count batch))
+             (do (async/close! channel) world)
+             (recur (apply-system-results world (<! channel)) (inc i)))))))
+
 (defn- apply-stage
   "Runs all the systems for a given stage and return the resulting game world."
   [world stage]
   (let [systems (-> world :systems (get stage))
         graph (-> world :metadata (get :system-graph dep/graph))
-        leaf-nodes (filter #(empty? (dep/immediate-dependents graph %)) systems)
-        channel (async/chan (count leaf-nodes))]
-
-        ;; New set for finished systems...
-        ;; Each system in the graph without dependencies gets its own thread to 
-        ;; build results from
-        ;; Run all systems in parallel and merge results
-        ;; Merge with world.
-        ;; See merge vs deep merging in merge docs.
-
-    ;; Return resulting world from stage.
-    (doseq [node leaf-nodes]
-      (async/go (>! channel (list node (apply-system world node)))))
-
-    ;; 1. Setup merged node set
-    ;; 2. Setup results map
-    ;; 3. When receiving results, check all dependants of the node. If we have 
-    ;; all their results, merge with world and loop? 
-    (loop [merged {}
-           results {}]
-      (let [[node instructions] (<! channel)
-            results (assoc results node instructions)]
-      (async/go (<! channel))))
-    ;; I have no fucking clue what to do here.
-
-    (async/close! channel)))
+        depths (find-depths systems graph)
+        batched-stages (->> (keys depths)
+                            (group-by depths)
+                            (vals))]
+    (reduce apply-system-batch world batched-stages)))
 
 
