@@ -104,9 +104,6 @@
   [world system]
   (:components system))
 
-(defn- can-apply-system [system graph completed]
-  (every? #(contains? completed %) (dep/transitive-dependencies graph system)))
-
 (defn- find-depths
   [systems graph]
   (let [leaf-nodes (filter #(empty? (dep/immediate-dependencies graph %)) systems)
@@ -144,8 +141,7 @@
   [world batch]
   (let [channel (async/chan)]
     (doseq [system batch]
-      ;; TODO: get system results properly
-      (async/go (>! channel (system world))))
+      (async/go (>! channel (apply-system system world))))
     ;; Blocking take from the result thread
     (<!! (async/go-loop [world world i 0]
            (if (>= i (count batch))
