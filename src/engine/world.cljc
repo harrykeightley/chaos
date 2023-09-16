@@ -199,11 +199,3 @@
                             (vals))]
     (reduce apply-system-batch world batched-stages)))
 
-(println (create-world))
-
-(defsys bbb "" {:components [:position]}
-  [:add ]
-  )
-
-(assoc-in)
-(bbb (create-world))
