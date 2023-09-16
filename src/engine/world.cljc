@@ -169,13 +169,13 @@
          ;           (f (drop 2 path)))]
          store (get stores component (ec/create-component-store))
          store (f store (drop 2 path))]
-     (assoc-in world [:components-stores component] store)))
+     (assoc-in world [:component-stores component] store)))
   ([f world path values]
    (let [component (second path)
          stores (:component-stores world)
          store (-> (get stores component (ec/create-component-store))
                    (f (drop 2 path) values))]
-     (assoc-in world [:components-stores component] store))))
+     (assoc-in world [:component-stores component] store))))
 
 (defn create-world
   "Creates a new empty world state"

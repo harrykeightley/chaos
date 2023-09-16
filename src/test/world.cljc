@@ -20,7 +20,19 @@
                depths (find-depths [:a :b :c :d :e :f] graph)]
            (println (vals (group-by depths (keys depths))))))
 
+;; Adding components
 (comment (-> (create-world)
              (es/adds [:components :position 1] [[1 2]])
              (es/sets [:resources :position] [2 3])
-             (es/adds [:resources :position] [1 2])))
+             (es/adds [:resources :position] [1 2])
+             :component-stores
+             :position
+             (ec/get-items)))
+
+;; Setting components
+(comment (-> (create-world)
+             (es/adds [:components :position 1] [[1 2]])
+             (es/sets [:components :position 1] (partial inc))
+             :component-stores
+             :position
+             (ec/get-items)))

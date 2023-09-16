@@ -33,7 +33,7 @@
       (= id (get dense (get sparse id)))))
 
   (insert [store id component]
-    (cond (has-id? store id) (assoc-in store [:dense (sparse id)] component)
+    (cond (has-id? store id) (assoc-in store [:components (sparse id)] component)
           (> id max-id) store
           :else (let [sparse (assoc sparse id n)
                       dense (assoc dense n id)
@@ -50,6 +50,7 @@
 
   (unset [store id]
     (cond (not (has-id? store id)) store
+          ;; Probably inneficint
           (= n 1) (create-component-store max-id)
           :else (let [last-index (- n 1)
                       old-id (get sparse id)
