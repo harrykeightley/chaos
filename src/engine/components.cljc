@@ -94,7 +94,7 @@
     (if (empty? path)
       (let [reducer (fn [store pair] (apply insert store pair))]
         (reduce reducer store values))
-      (es/adds store nil (map vector path values))))
+      (es/sets store nil (mapv vector path values))))
 
   Object
   (toString [store]
