@@ -1,12 +1,16 @@
-(ns engine.engine
+(ns engine.world
   (:require [com.stuartsierra.dependency :as dep]
-            ;;[clojure.core :as cc :refer [with-bindings]]
             [clojure.core.async :as async :refer [>! <! <!!]]
             [engine.components :as ec]))
 
 (defprotocol World
-  (create-entity [world]
-    "Creates a unique entity within the world.")
+  (create-entity [world] [world start]
+    "Finds a unique entity within the world. If `start` is supplied, starts
+    counting from `(+ start 1)`.
+
+    Doesn't actually reserve this id, so if creating multiple entities, the 
+    id of the first should be passed in as the `start` parameter when generating 
+    the second.")
 
   (add-system [world stage system]
     "Adds the system to the world under the supplied stage.")
@@ -30,6 +34,12 @@
     <Transform, Player> component tuples, corresponding to all entities in the 
     world with both Transform and Player components.")
 
+  (get-events [world event]
+    "Gets all the events which of the supplied type")
+
+  (get-resources [world resources]
+    "Returns a map from supplied resource names to their values.")
+
   (step [world]
     "Runs one step of the world and returns the resulting world. 
     
@@ -37,7 +47,7 @@
 
 (declare apply-stage)
 
-(defn- unique-int
+(defn unique-int
   "Returns an integer that doesn't exist in the given set, `existing`.
 
   To optimize, starts searching from `count`.
@@ -50,8 +60,8 @@
 
 (defrecord GameWorld [entities component-stores events resources systems metadata]
   World
-  (create-entity [_]
-    (unique-int entities 0))
+  (create-entity [_] (unique-int entities 0))
+  (create-entity [_ start] (unique-int entities start))
 
   (add-systems
     [world stage systems]
@@ -91,9 +101,9 @@
       (if (empty? components)
         nil
         (let [ids (->> (first sorted-components) ;; component-type with smallest count
-                      component-stores
-                      ec/get-items
-                      (map first))
+                       component-stores
+                       ec/get-items
+                       (map first))
               other-stores (map component-stores (rest sorted-components))
               reducer (fn [ids store]
                         (filter #(ec/has-id? store %) ids))
@@ -103,6 +113,12 @@
               stores (map component-stores components)
               build-tuple (fn [id] (map #(ec/get-component % id) stores))]
           (map build-tuple matching-ids)))))
+
+  (get-events [world event-type]
+    (get events event-type))
+
+  (get-resources [world requested-resources]
+    (select-keys resources requested-resources))
 
   (step
     [world]
@@ -121,17 +137,18 @@
   (when-not (contains? (:metadata world) :exit)
     (recur (step world))))
 
-;; Test add-systems
-(comment (-> (create-world)
-             (add-systems :update (->WorldSystem add-systems #{:test}))
-             (add-systems :update (->WorldSystem #(println "hello") #{:test}))
-             (add-systems :next (->WorldSystem #(println "goodbye") #{:test}))))
+(defmacro defsys
+  "Creates a macro for specifying systems based on their dependencies, and 
+  creates bindings for the all bindings passed in."
+  {:clj-kondo/ignore [:unresolved-symbol]} ;; supress linting errors
+  [system-name doc bindings & body]
+  `(defn ~(symbol system-name) ~doc [world#]
+     (let [~'components (query world# ~(:components bindings))
+           ~'resources (get-resources world# ~(:resources bindings))
+           ~'events (get-events world# ~(:events bindings))]
+       ~@body)))
 
-;; test add-stage-dependency
-(comment (let [world (-> (create-world) (add-stage-dependency :a :b))]
-           (-> world :metadata :stage-graph dep/topo-sort)))
-
-(defn- find-depths
+(defn find-depths
   "Performs BFS on the systems in a graph to determine their depths.
   Returns a map from systems to depths.
   
@@ -140,7 +157,8 @@
   [systems graph]
   (let [leaf-nodes (filter #(empty? (dep/immediate-dependencies graph %)) systems)
         initial-nodes (zipmap leaf-nodes (repeat 0))]
-    (loop [queue (reduce conj clojure.lang.PersistentQueue/EMPTY initial-nodes)
+    (loop [queue (reduce conj #?(:cljs #queue []
+                                 :default clojure.lang.PersistentQueue/EMPTY) initial-nodes)
            result {}]
       (if (empty? queue) result
           (let [[node depth] (peek queue)
@@ -152,20 +170,9 @@
                              next-node)]
             (recur (reduce conj (pop queue) next-nodes) (assoc result node depth)))))))
 
-(comment (let [graph (-> (dep/graph)
-                         (dep/depend :b :a)
-                         (dep/depend :c :a)
-                         (dep/depend :d :b)
-                         (dep/depend :d :a)
-                         (dep/depend :e :c)
-                         (dep/depend :f :a)
-                         (dep/depend :f :c)
-                         (dep/depend :f :d))
-               depths (find-depths [:a :b :c :d :e :f] graph)]
-           (println (vals (group-by depths (keys depths))))))
-
 (defn- apply-system-results
   "Takes the results of running a system and applies them to the world. "
+  ;; TODO
   [world results] world)
 
 (defn- apply-system-batch
@@ -192,4 +199,11 @@
                             (vals))]
     (reduce apply-system-batch world batched-stages)))
 
+(println (create-world))
 
+(defsys bbb "" {:components [:position]}
+  [:add ]
+  )
+
+(assoc-in)
+(bbb (create-world))
