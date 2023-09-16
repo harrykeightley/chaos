@@ -55,13 +55,6 @@
     (is (= 23 (ec/get-component store 1)))
     (is (= 40 (ec/get-component store 2)))))
 
-;; todo remove
-(comment (let [store (-> (create-component-store 10)
-                         (es/adds [1] [23])
-                         (es/sets [1] [40])
-                         (es/sets nil [[2 40]]))]
-           store))
-
 (deftest test-store-set
   (let [store (-> (create-component-store 10)
                   (es/adds [1] [23])
@@ -70,5 +63,23 @@
     (is (= 2 (count (ec/get-items store))))
     (is (= 40 (ec/get-component store 1)))
     (is (= 40 (ec/get-component store 2)))))
+
+(deftest test-store-delete
+  (let [store (-> (create-component-store 10)
+                  (es/adds [1] [23])
+                  (es/adds [2] [40])
+                  (es/adds [3] [30])
+                  (es/deletes [1])
+                  (es/deletes nil [2 3]))] ;; other way of setting
+    (is (empty? (ec/get-items store)))))
+
+(deftest test-store-update
+  (let [store (-> (create-component-store 10)
+                  (es/adds [1] [10])
+                  (es/adds [2] [20])
+                  (es/adds [3] [30])
+                  (es/updates [1] (partial * 2))
+                  (es/updates [2 3] (partial * 3)))] ;; other way of setting
+    (is (every? #{20 60 90} (ec/get-components store)))))
 
 (run-tests)

@@ -84,17 +84,22 @@
   (deletes [store _ values]
     (reduce unset store values))
 
-  ;; Applies `f` to the component at `path`
+  ;; Applies `f` to the all ids at `path`, or all components if path is nil.
   (updates [store path f]
-    (update-in store (cons :components path) #(reduce f %)))
+    (if (empty? path)
+      (update-in store [:components] (partial map f))
+      (let [reducer (fn [store id]
+                      (insert store id (f (get-component store id))))
+            ids (filter (partial has-id? store) path)]
+        (reduce reducer store ids))))
 
-  ;; Note: Expects values to be (id, component) pairs or for path to be 
+;; Note: Expects values to be (id, component) pairs or for path to be 
   ;; a sequence of ids and values to be a sequence of matching components.
   (sets [store path values]
     (if (empty? path)
       (let [reducer (fn [store pair] (apply insert store pair))]
         (reduce reducer store values))
-      (es/sets store nil (mapv vector path values))))
+      (es/sets store nil (map vector path values))))
 
   Object
   (toString [store]
