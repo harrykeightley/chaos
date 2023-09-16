@@ -81,10 +81,10 @@
       (es/deletes store nil path)))
 
   ;; Expects values to be a sequence of ids
-  (deletes [store _ values]
-    (reduce unset store values))
+  (deletes [store path values]
+    (reduce unset store (concat path values)))
 
-  ;; Applies `f` to the all ids at `path`, or all components if path is nil.
+;; Applies `f` to the all ids at `path`, or all components if path is nil.
   (updates [store path f]
     (if (empty? path)
       (update-in store [:components] (partial map f))

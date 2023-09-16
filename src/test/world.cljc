@@ -55,6 +55,16 @@
         component (-> world :component-stores :position (ec/get-component 1))]
     (is (= [2 4] component))))
 
+(deftest test-update-all-components
+  (let [world (-> (create-world)
+                  (es/adds [:components :position 1] [1])
+                  (es/adds [:components :position 2] [2])
+                  (es/adds [:components :position 3] [3])
+                  (es/adds [:components :position 4] [4])
+                  (es/updates [:components :position] (partial * 2)))
+        components (-> world :component-stores :position (ec/get-components))]
+    (is (every? #{2 4 6 8} components))))
+
 (deftest test-delete-component
   (let [world (-> (create-world)
                   (es/adds [:components :position 1] [[1 2]])
@@ -63,6 +73,5 @@
                   (es/deletes [:components :position] [2]))
         components (-> world :component-stores :position (ec/get-components))]
     (is (empty? components))))
-
 
 (run-tests)

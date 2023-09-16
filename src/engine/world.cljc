@@ -147,7 +147,7 @@
         (es/sets world path values))))
 
   (deletes [world path]
-    (es/deletes world (drop-last 1 path) (last path)))
+    (es/deletes world (drop-last 1 path) [(last path)]))
 
   (deletes [world path values]
     (case (first path)
