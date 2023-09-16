@@ -21,7 +21,6 @@
                   (ec/insert 2 21))]
     (is (ec/has-id? store 1))))
 
-;; Test deletion on first element
 (deftest test-delete-one
   (let [store (-> (create-component-store 10)
                   (ec/insert 1 23)
@@ -37,7 +36,6 @@
     (is (not (ec/has-id? store 1)))
     (is (ec/has-id? store 2))))
 
-;; Test deletion on first element
 (deftest test-set
   (let [store (-> (create-component-store 10)
                   (ec/insert 1 23)

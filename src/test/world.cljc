@@ -2,6 +2,7 @@
   (:require [engine.world :refer :all]
             [engine.components :as ec]
             [com.stuartsierra.dependency :as dep]
+            [clojure.test :refer [deftest is run-tests]]
             [engine.store :as es]))
 
 ;; test add-stage-dependency
@@ -20,19 +21,48 @@
                depths (find-depths [:a :b :c :d :e :f] graph)]
            (println (vals (group-by depths (keys depths))))))
 
-;; Adding components
-(comment (-> (create-world)
-             (es/adds [:components :position 1] [[1 2]])
-             (es/sets [:resources :position] [2 3])
-             (es/adds [:resources :position] [1 2])
-             :component-stores
-             :position
-             (ec/get-items)))
+;; ------- Store Protocol functions --------
+(deftest test-add-component
+  (let [world (-> (create-world)
+                  (es/adds [:components :position 1] [[1 2]]))
+        component (-> world :component-stores :position (ec/get-component 1))]
+    (is (= [1 2] component))))
 
-;; Setting components
-(comment (-> (create-world)
-             (es/adds [:components :position 1] [[1 2]])
-             (es/sets [:components :position 1] (partial inc))
-             :component-stores
-             :position
-             (ec/get-items)))
+(deftest test-adding-component-with-same-id-does-nothing
+  (let [world (-> (create-world)
+                  (es/adds [:components :position 1] [[1 2]])
+                  (es/adds [:components :position 1] [[2 3]]))
+        component (-> world :component-stores :position (ec/get-component 1))]
+    (is (= [1 2] component))))
+
+(deftest test-set-component
+  (let [world (-> (create-world)
+                  (es/sets [:components :position 1] [[1 2]]))
+        component (-> world :component-stores :position (ec/get-component 1))]
+    (is (= [1 2] component))))
+
+(deftest test-setting-component-should-override
+  (let [world (-> (create-world)
+                  (es/adds [:components :position 1] [[1 2]])
+                  (es/sets [:components :position 1] [[2 3]]))
+        component (-> world :component-stores :position (ec/get-component 1))]
+    (is (= [2 3] component))))
+
+(deftest test-update-component
+  (let [world (-> (create-world)
+                  (es/adds [:components :position 1] [[1 2]])
+                  (es/updates [:components :position 1] #(map (partial * 2) %)))
+        component (-> world :component-stores :position (ec/get-component 1))]
+    (is (= [2 4] component))))
+
+(deftest test-delete-component
+  (let [world (-> (create-world)
+                  (es/adds [:components :position 1] [[1 2]])
+                  (es/adds [:components :position 2] [[2 4]])
+                  (es/deletes [:components :position 1])
+                  (es/deletes [:components :position] [2]))
+        components (-> world :component-stores :position (ec/get-components))]
+    (is (empty? components))))
+
+
+(run-tests)

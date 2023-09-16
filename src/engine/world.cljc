@@ -223,8 +223,18 @@
 
 (defn- apply-system-results
   "Takes the results of running a system and applies them to the world. "
-  ;; TODO
-  [world results] world)
+  [world results]
+  (let [apply-result (fn [world result]
+                       (let [[k path values] result
+                             f (case k
+                                 :add es/adds
+                                 :set es/sets
+                                 :update es/updates
+                                 :deletes es/deletes
+                                 (do (println "Invalid command:" k)
+                                     #(first %&)))]
+                         (f world path values)))]
+    (reduce apply-result world results)))
 
 (defn- apply-system-batch
   "Applies a sequence of independent systems and return the resulting world."
