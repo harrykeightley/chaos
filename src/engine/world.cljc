@@ -1,7 +1,9 @@
 (ns engine.world
   (:require [com.stuartsierra.dependency :as dep]
             [clojure.core.async :as async :refer [>! <! <!!]]
-            [engine.components :as ec]))
+            ;;[clojure.core.match :refer [match]]
+            [engine.components :as ec]
+            [engine.store :as es :refer [Store]]))
 
 (defprotocol World
   (create-entity [world] [world start]
@@ -46,6 +48,7 @@
     Equivalent to running all stages."))
 
 (declare apply-stage)
+(declare forward-to-components)
 
 (defn unique-int
   "Returns an integer that doesn't exist in the given set, `existing`.
@@ -124,7 +127,55 @@
     [world]
     (let [sorted-stages (-> world :metadata :stage-graph dep/topo-sort)]
         ;; TODO: Maybe include services added to stages without dependencies??
-      (reduce apply-stage sorted-stages))))
+      (reduce apply-stage sorted-stages)))
+
+  Store
+  (sets [world path values]
+    (case (first path)
+      :components (forward-to-components es/sets world path values)
+      (assoc-in world path values)))
+
+  (adds [world path values]
+    (case (first path)
+      :components (forward-to-components es/adds world path values)
+      :events (let [event (second path)
+                    result (get events event [])
+                    result (apply conj result values)]
+                (assoc-in world [:events event] result))
+      (if (get-in world path)
+        world ;; if already exists, just return.
+        (es/sets world path values))))
+
+  (deletes [world path]
+    (es/deletes world (drop-last 1 path) (last path)))
+
+  (deletes [world path values]
+    (case (first path)
+      :components (forward-to-components es/deletes world path values)
+      (update-in world path #(apply dissoc % values))))
+
+  (updates [world path f]
+    (case (first path)
+      :components (forward-to-components es/updates world path f)
+      (update-in world path f))))
+
+;; Todo figure out how to simplify
+(defn- forward-to-components
+  "Forwards a `engine.store/Store` method to the relevant component store."
+  ([f world path]
+   (let [component (second path)
+         stores (:component-stores world)
+         ; store (-> (get stores component (ec/create-component-store))
+         ;           (f (drop 2 path)))]
+         store (get stores component (ec/create-component-store))
+         store (f store (drop 2 path))]
+     (assoc-in world [:components-stores component] store)))
+  ([f world path values]
+   (let [component (second path)
+         stores (:component-stores world)
+         store (-> (get stores component (ec/create-component-store))
+                   (f (drop 2 path) values))]
+     (assoc-in world [:components-stores component] store))))
 
 (defn create-world
   "Creates a new empty world state"

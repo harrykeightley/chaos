@@ -1,6 +1,8 @@
 (ns test.world
   (:require [engine.world :refer :all]
-            [com.stuartsierra.dependency :as dep]))
+            [engine.components :as ec]
+            [com.stuartsierra.dependency :as dep]
+            [engine.store :as es]))
 
 ;; test add-stage-dependency
 (comment (let [world (-> (create-world) (add-stage-dependency :a :b))]
@@ -17,3 +19,8 @@
                          (dep/depend :f :d))
                depths (find-depths [:a :b :c :d :e :f] graph)]
            (println (vals (group-by depths (keys depths))))))
+
+(comment (-> (create-world)
+             (es/adds [:components :position 1] [[1 2]])
+             (es/sets [:resources :position] [2 3])
+             (es/adds [:resources :position] [1 2])))

@@ -1,4 +1,6 @@
-(ns engine.components)
+(ns engine.components
+  (:require [engine.store :as es :refer [Store]]
+            [engine.utils :refer [mapper manip-map]]))
 
 (defprotocol SparseSet
   (has-id? [s id]
@@ -37,18 +39,18 @@
                       dense (assoc dense n id)
                       components (assoc components n component)
                       n (inc n)]
-                  (merge store {:keys [sparse dense components n]}))))
+                  (merge store (mapper sparse dense components n)))))
 
   (get-component [_ id]
     (->> (get sparse id) (get components)))
 
   (get-components [_] (take n components))
 
-  (get-items [_] (map vector dense components))
+  (get-items [_] (take n (map vector dense components)))
 
   (unset [store id]
     (cond (not (has-id? store id)) store
-          (= n 1) (create-component-store)
+          (= n 1) (create-component-store max-id)
           :else (let [last-index (- n 1)
                       old-id (get sparse id)
                       replacement-id (get dense last-index)
@@ -57,16 +59,52 @@
                       sparse (assoc sparse replacement-id old-id)
                       components (assoc components old-id replacement)
                       n (dec n)]
-                  (merge store {:keys [sparse dense components n]})))))
+                  (merge store (mapper sparse dense components n)))))
+
+  Store
+  ;; Note: Expects values to be (id, component) pairs or for path to be 
+  ;; a sequence of ids and values to be a sequence of matching components.
+  (adds [store path values]
+    (if (empty? path)
+      (let [reducer (fn [store pair]
+                      (let [[id component] pair]
+                        (if (has-id? store id) store
+                            (insert store id component))))]
+        (reduce reducer store values))
+      (es/adds store nil (map vector path values))))
+
+  ;; Resets the store if path is empty, else deletes all remaining ids on path.
+  (deletes [store path]
+    (if (empty? path)
+      (create-component-store)
+      (es/deletes store nil path)))
+
+  ;; Expects values to be a sequence of ids
+  (deletes [store _ values]
+    (reduce unset store values))
+
+  ;; Applies `f` to the component at `path`
+  (updates [store path f]
+    (update-in store (cons :components path) #(reduce f %)))
+
+  ;; Note: Expects values to be (id, component) pairs or for path to be 
+  ;; a sequence of ids and values to be a sequence of matching components.
+  (sets [store path values]
+    (if (empty? path)
+      (let [reducer (fn [store pair] (apply insert store pair))]
+        (reduce reducer store values))
+      (es/adds store nil (map vector path values))))
+
+  Object
+  (toString [store]
+    (manip-map store [:sparse :dense :components] #(take n %))))
 
 (defn create-component-store
   "Default constructor for a new ComponentStore."
   ([]
-   (create-component-store
-    #?(:cljs 2147483647 ;; 2 ** 32
-       :default Integer/MAX_VALUE)))
+   (create-component-store 65536))
   ([size]
-   (let [empty-array (vec (repeat size nil))]
+   (let [empty-array (vec (repeat size 0))]
      (->ComponentStore size 0 empty-array empty-array empty-array))))
 
 
