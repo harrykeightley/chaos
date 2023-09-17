@@ -6,6 +6,9 @@
             [engine.store :as es :refer [Store]]))
 
 (defprotocol World
+  (get-entities [world]
+    "Returns all entities in the world")
+
   (create-entity [world] [world start]
     "Finds a unique entity within the world. If `start` is supplied, starts
     counting from `(+ start 1)`.
@@ -61,10 +64,15 @@
       (recur existing next-entity)
       next-entity)))
 
-(defrecord GameWorld [entities component-stores events resources systems metadata]
+(defrecord GameWorld [component-stores events resources systems metadata]
   World
-  (create-entity [_] (unique-int entities 0))
-  (create-entity [_ start] (unique-int entities start))
+  (get-entities [_]
+    (-> (get component-stores :id (ec/create-component-store))
+        (ec/get-components)
+        set))
+
+  (create-entity [world] (create-entity world 0))
+  (create-entity [world start] (unique-int (get-entities world) start))
 
   (add-systems
     [world stage systems]
@@ -159,28 +167,30 @@
       :components (forward-to-components es/updates world path f)
       (update-in world path f))))
 
-;; Todo figure out how to simplify
 (defn- forward-to-components
   "Forwards a `engine.store/Store` method to the relevant component store."
   ([f world path]
-   (let [component (second path)
-         stores (:component-stores world)
-         ; store (-> (get stores component (ec/create-component-store))
-         ;           (f (drop 2 path)))]
-         store (get stores component (ec/create-component-store))
-         store (f store (drop 2 path))]
-     (assoc-in world [:component-stores component] store)))
+   (forward-to-components f world path nil))
   ([f world path values]
    (let [component (second path)
+         remaining-path (drop 2 path)
          stores (:component-stores world)
          store (-> (get stores component (ec/create-component-store))
-                   (f (drop 2 path) values))]
-     (assoc-in world [:component-stores component] store))))
+                   (f remaining-path values))
+         ;; Create all necessary entity ids if we haven't yet seen them.
+         entities (get stores :id (ec/create-component-store))
+         ids-to-create (cond (not (#{es/adds es/sets} f)) nil
+                             (empty? remaining-path) (map first values)
+                             :else remaining-path)
+         entities (reduce #(ec/insert %1 %2 %2) entities ids-to-create)]
+     (-> world
+         (assoc-in [:component-stores component] store)
+         (assoc-in [:component-stores :id] entities)))))
 
 (defn create-world
   "Creates a new empty world state"
   ^GameWorld []
-  (->GameWorld #{} {} {} {} {} {}))
+  (->GameWorld {} {} {} {} {}))
 
 (defn play
   "Runs the world until the :exit flag is set."
@@ -233,6 +243,7 @@
                                  :deletes es/deletes
                                  (do (println "Invalid command:" k)
                                      #(first %&)))]
+                         ;; TODO emit a raw event of the results just processed.
                          (f world path values)))]
     (reduce apply-result world results)))
 

@@ -74,4 +74,12 @@
         components (-> world :component-stores :position (ec/get-components))]
     (is (empty? components))))
 
+(deftest test-auto-create-entity
+  
+  (let [world (-> (create-world)
+                  (es/adds [:components :position 1] [[1 2]]))
+        entities (-> world :component-stores :id (ec/get-components))]
+    (is (some #{1} entities)))
+  )
+
 (run-tests)
