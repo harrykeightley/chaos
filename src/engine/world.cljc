@@ -29,8 +29,8 @@
   (add-system-dependency [world system dependency]
     "Add intrastage system dependencies")
 
-  (add-stage-dependency [world stage kind]
-    "Makes sure the stage is run after all its dependencies have.")
+  (add-stage-dependency [world stage dependency]
+    "Makes sure the stage is run after the supplied dependency")
 
   (query [world required-components]
     "Returns a zipped sequence of components whose entity has all the components 
@@ -46,6 +46,9 @@
   (get-resources [world resources]
     "Returns a map from supplied resource names to their values.")
 
+  (apply-stage [world stage]
+    "Runs all the systems for a given stage and return the resulting game world.")
+
   (step [world]
     "Runs one step of the world and returns the resulting world. 
     
@@ -54,19 +57,10 @@
   (play [world]
     "Runs the world until the :exit flag is set."))
 
-(declare apply-stage)
+(declare find-depths)
+(declare apply-system-batch)
 (declare forward-to-components)
-
-(defn unique-int
-  "Returns an integer that doesn't exist in the given set, `existing`.
-
-  To optimize, starts searching from `count`.
-  "
-  [existing start]
-  (let [next-entity (inc start)]
-    (if (contains? existing next-entity)
-      (recur existing next-entity)
-      next-entity)))
+(declare unique-int)
 
 (def reserved-stages
   #{:start-up
@@ -143,6 +137,17 @@
 
   (get-resources [_ requested-resources]
     (select-keys resources requested-resources))
+
+  (apply-stage
+    [world stage]
+    (let [systems (get systems stage)
+          graph (get metadata :system-graph dep/graph)
+        ;; TODO I could probably cache this
+          depths (find-depths systems graph)
+          batched-stages (->> (keys depths)
+                              (group-by depths)
+                              (vals))]
+      (reduce apply-system-batch world batched-stages)))
 
   (step [world]
     (let [sorted-stages (->> world
@@ -284,15 +289,14 @@
              (do (async/close! channel) world)
              (recur (apply-system-results world (<! channel)) (inc i)))))))
 
-(defn- apply-stage
-  "Runs all the systems for a given stage and return the resulting game world."
-  [world stage]
-  (let [systems (-> world :systems (get stage))
-        graph (-> world :metadata (get :system-graph dep/graph))
-        ;; TODO I could probably cache this
-        depths (find-depths systems graph)
-        batched-stages (->> (keys depths)
-                            (group-by depths)
-                            (vals))]
-    (reduce apply-system-batch world batched-stages)))
+(defn unique-int
+  "Returns an integer that doesn't exist in the given set, `existing`.
+
+  To optimize, starts searching from `count`.
+  "
+  [existing start]
+  (let [next-entity (inc start)]
+    (if (contains? existing next-entity)
+      (recur existing next-entity)
+      next-entity)))
 
