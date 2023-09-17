@@ -55,7 +55,7 @@
     Equivalent to running all stages.")
 
   (play [world]
-    "Runs the world until the :exit flag is set."))
+    "Runs the world until the :exit flag is set within its metadata"))
 
 (declare find-depths)
 (declare apply-system-batch)
@@ -86,7 +86,7 @@
                      (concat systems)
                      (assoc-in world [:systems stage]))]
       ;; Ensure update happens before user-added stages.
-      (if (some reserved-stages stage)
+      (if (reserved-stages stage)
         world
         (add-stage-dependency world stage :update))))
 
@@ -141,7 +141,7 @@
   (apply-stage
     [world stage]
     (let [systems (get systems stage)
-          graph (get metadata :system-graph dep/graph)
+          graph (get metadata :system-graph (dep/graph))
         ;; TODO I could probably cache this
           depths (find-depths systems graph)
           batched-stages (->> (keys depths)
@@ -150,9 +150,7 @@
       (reduce apply-system-batch world batched-stages)))
 
   (step [world]
-    (let [sorted-stages (->> world
-                             :metadata
-                             :stage-graph
+    (let [sorted-stages (->> (get-in world [:metadata :stage-graph] (dep/graph))
                              dep/topo-sort
                              (filter (partial not-any? reserved-stages)))]
       (-> world
@@ -165,6 +163,7 @@
   (play [world]
     (-> world
         (apply-stage :start-up)
+        ;; TODO Should clean up with reduce
         (#(loop [world %]
             (if (contains? (:metadata world) :exit)
               world
