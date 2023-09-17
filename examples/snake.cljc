@@ -87,20 +87,19 @@
    :events :tick
    :components [:position]}
   ;; Note this might not look so bad without the event business
-  (println "Display!")
   (if (empty? events) []
       (let [length (get resources :length 2)
             body-store (get-in world [:components :body])
             display-char (fn [position]
-                           (if ((set components) position)
-                             \#
-                             \space))]
-        (println "Where am i?")
+                           (if (set components) position
+                               \#
+                               \space))]
         (replace-cursor)
         (doseq [row (range 10)]
           (doseq [col (range 10)]
             (print (display-char [row col])))
           (println))
+        (flush)
         [])))
 
 (defn -main [& args]
