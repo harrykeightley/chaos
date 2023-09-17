@@ -152,7 +152,7 @@
   (step [world]
     (let [sorted-stages (->> (get-in world [:metadata :stage-graph] (dep/graph))
                              dep/topo-sort
-                             (filter (partial not-any? reserved-stages)))]
+                             (remove (set reserved-stages)))]
       (-> world
           (apply-stage :pre-step)
           ;; TODO feels like this shouldnt be here...
@@ -269,7 +269,7 @@
                                  :add es/adds
                                  :set es/sets
                                  :update es/updates
-                                 :deletes es/deletes
+                                 :delete es/deletes
                                  (do (println "Invalid command:" k)
                                      #(first %&)))]
                          ;; TODO emit a raw event of the results just processed.

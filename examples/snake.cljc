@@ -49,9 +49,9 @@
 (defsys add-snake "Adds the initial snake components" {}
   (let [length 2
         ids (generate-ids world length)]
-    [[:add [:resource :length] 2]
-     [:add [:resource :head] [2 1]]
-     [:add [:resource :direction] :down]
+    [[:add [:resources :length] 2]
+     [:add [:resources :head] [2 1]]
+     [:add [:resources :direction] :down]
      [:add [:components :position] (map vector ids [[1 1] [2 1]])]
      ;; Reversing ids so that tail positions have higher indicies
      [:add [:components :body] (map vector (reverse ids) (range 1 (+ 1 length)))]]))
@@ -75,7 +75,7 @@
   (if (empty? events)
     []
     (let [length (:length resources)
-          to-remove (->> (filter #(< length (second %)) components)
+          to-remove (->> (filter #(<= length (second %)) components)
                          (map first))]
       [[:delete [:components :body] to-remove]
        [:delete [:components :position] to-remove]
@@ -87,20 +87,21 @@
    :events :tick
    :components [:position]}
   ;; Note this might not look so bad without the event business
-  (if (empty? events)
-    []
-    (let [length (:length resources)
-          body-store (get-in world [:components :body])
-          display-char (fn [position]
-                         (if ((set components) position)
-                           \#
-                           \space))]
-      (replace-cursor)
-      (doseq [row (range 10)]
-        (doseq [col (range 10)]
-          (print (display-char [row col])))
-        (println))
-      [])))
+  (println "Display!")
+  (if (empty? events) []
+      (let [length (get resources :length 2)
+            body-store (get-in world [:components :body])
+            display-char (fn [position]
+                           (if ((set components) position)
+                             \#
+                             \space))]
+        (println "Where am i?")
+        (replace-cursor)
+        (doseq [row (range 10)]
+          (doseq [col (range 10)]
+            (print (display-char [row col])))
+          (println))
+        [])))
 
 (defn -main [& args]
   (-> (ew/create-world)
@@ -108,10 +109,10 @@
       (ew/add-system :start-up add-snake)
       (ew/add-system :update tick!)
       (ew/add-system :update shout)
+      (ew/add-system-dependency shout tick!)
       (ew/add-system :post-step reset-events)
       (ew/add-systems [move-head move-tail])
       (ew/add-system-dependency move-tail move-head)
-      (ew/add-system-dependency shout tick!)
       (ew/add-system :display display-game)
       (ew/play)))
 
