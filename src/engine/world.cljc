@@ -105,7 +105,7 @@
           metadata (assoc (:metadata world) :system-graph next-graph)]
       (assoc world :metadata metadata)))
 
-  (query [world required-component-types]
+  (query [_ required-component-types]
     (let [length (fn [component] (-> (component-stores component) :n))
           components (filter component-stores required-component-types)
           sorted-components (sort-by length components)]
@@ -125,10 +125,10 @@
               build-tuple (fn [id] (map #(ec/get-component % id) stores))]
           (map build-tuple matching-ids)))))
 
-  (get-events [world event-type]
+  (get-events [_ event-type]
     (get events event-type))
 
-  (get-resources [world requested-resources]
+  (get-resources [_ requested-resources]
     (select-keys resources requested-resources))
 
   (step
@@ -204,9 +204,11 @@
   {:clj-kondo/ignore [:unresolved-symbol]} ;; supress linting errors
   [system-name doc bindings & body]
   `(defn ~(symbol system-name) ~doc [world#]
-     (let [~'components (query world# ~(:components bindings))
+     (let [~'world world#
+           ~'components (query world# ~(:components bindings))
            ~'resources (get-resources world# ~(:resources bindings))
            ~'events (get-events world# ~(:events bindings))]
+       ;; TODO Make it so if events requested but events are empty, return nil
        ~@body)))
 
 (defn find-depths
