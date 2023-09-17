@@ -1,7 +1,6 @@
 (ns engine.world
   (:require [com.stuartsierra.dependency :as dep]
             [clojure.core.async :as async :refer [>! <! <!!]]
-            ;;[clojure.core.match :refer [match]]
             [engine.components :as ec]
             [engine.store :as es :refer [Store]]))
 
@@ -17,16 +16,18 @@
     id of the first should be passed in as the `start` parameter when generating 
     the second.")
 
-  (add-system [world stage system]
-    "Adds the system to the world under the supplied stage.")
+  (add-system [world stage system] [world system]
+    "Adds the system to the world under the supplied stage. 
 
-  (add-systems [world stage systems]
-    "Adds the systems to the world under the supplied stage.")
+    If no stage is supplied, adds the system under the `:update` stage")
+
+  (add-systems [world stage systems] [world systems]
+    "Adds the systems to the world under the supplied stage.
+
+    If no stage is supplied, adds all systems under the `:update` stage")
 
   (add-system-dependency [world system dependency]
     "Add intrastage system dependencies")
-
-  (add-stage [world stage kind])
 
   (add-stage-dependency [world stage kind]
     "Makes sure the stage is run after all its dependencies have.")
@@ -48,7 +49,10 @@
   (step [world]
     "Runs one step of the world and returns the resulting world. 
     
-    Equivalent to running all stages."))
+    Equivalent to running all stages.")
+
+  (play [world]
+    "Runs the world until the :exit flag is set."))
 
 (declare apply-stage)
 (declare forward-to-components)
@@ -64,6 +68,11 @@
       (recur existing next-entity)
       next-entity)))
 
+(def reserved-stages
+  #{:start-up
+    :pre-step :pre-stage :update :post-stage :post-step
+    :tear-down})
+
 (defrecord GameWorld [component-stores events resources systems metadata]
   World
   (get-entities [_]
@@ -71,23 +80,28 @@
         (ec/get-components)
         set))
 
-  (create-entity [world] (create-entity world 0))
-  (create-entity [world start] (unique-int (get-entities world) start))
+  (create-entity [world]
+    (create-entity world 0))
+  (create-entity [world start]
+    (unique-int (get-entities world) start))
 
-  (add-systems
-    [world stage systems]
-    (let [current-systems (:systems world)
-          systems-of-stage (get current-systems stage)
-          next-systems-of-stage (apply conj systems-of-stage systems)
-          next-systems (assoc current-systems stage next-systems-of-stage)]
-      (assoc world :systems next-systems)))
+  (add-systems [world systems]
+    (add-systems world :update systems))
+  (add-systems [world stage systems]
+    (let [world (->> (get-in world [:systems stage])
+                     (concat systems)
+                     (assoc-in world [:systems stage]))]
+      ;; Ensure update happens before user-added stages.
+      (if (some reserved-stages stage)
+        world
+        (add-stage-dependency world stage :update))))
 
-  (add-system
-    [world stage system]
+  (add-system [world system]
+    (add-system world :update system))
+  (add-system [world stage system]
     (add-systems world stage (list system)))
 
-  (add-stage-dependency
-    [world stage dependency]
+  (add-stage-dependency [world stage dependency]
     (let [graph (-> world
                     :metadata
                     (get :stage-graph (dep/graph)))
@@ -96,8 +110,7 @@
 
       (assoc world :metadata metadata)))
 
-  (add-system-dependency
-    [world system dependency]
+  (add-system-dependency [world system dependency]
     (let [graph (-> world
                     :metadata
                     (get :system-graph (dep/graph)))
@@ -131,11 +144,27 @@
   (get-resources [_ requested-resources]
     (select-keys resources requested-resources))
 
-  (step
-    [world]
-    (let [sorted-stages (-> world :metadata :stage-graph dep/topo-sort)]
-        ;; TODO: Maybe include services added to stages without dependencies??
-      (reduce apply-stage sorted-stages)))
+  (step [world]
+    (let [sorted-stages (->> world
+                             :metadata
+                             :stage-graph
+                             dep/topo-sort
+                             (filter (partial not-any? reserved-stages)))]
+      (-> world
+          (apply-stage :pre-step)
+          ;; TODO feels like this shouldnt be here...
+          (apply-stage :update)
+          (#(reduce apply-stage % sorted-stages))
+          (apply-stage :post-step))))
+
+  (play [world]
+    (-> world
+        (apply-stage :start-up)
+        (#(loop [world %]
+            (if (contains? (:metadata world) :exit)
+              world
+              (recur (step world)))))
+        (apply-stage :tear-down)))
 
   Store
   (sets [world path values]
@@ -191,12 +220,6 @@
   "Creates a new empty world state"
   ^GameWorld []
   (->GameWorld {} {} {} {} {}))
-
-(defn play
-  "Runs the world until the :exit flag is set."
-  [world]
-  (when-not (contains? (:metadata world) :exit)
-    (recur (step world))))
 
 (defmacro defsys
   "Creates a macro for specifying systems based on their dependencies, and 

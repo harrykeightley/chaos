@@ -12,6 +12,11 @@
 (defmacro mapper [& args]
   `(zipmap ~(mapv (comp keyword name) args) [~@args]))
 
+(defn millis! []
+  #?(:cljs (-> (.. js/Date now) (/ 1000) (.floor js/Math))
+     :default (inst-ms (java.time.Instant/now))))
+
 (comment (let [a 1 b 2 c 3]
            (macroexpand
             (mapper a b c))))
+
