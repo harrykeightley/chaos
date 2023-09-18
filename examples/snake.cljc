@@ -91,7 +91,7 @@
       (let [length (get resources :length 2)
             body-store (get-in world [:components :body])
             display-char (fn [position]
-                           (if (set components) position
+                           (if ((set components) position)
                                \#
                                \space))]
         (replace-cursor)
