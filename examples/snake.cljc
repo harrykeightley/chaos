@@ -33,15 +33,12 @@
         next-timer (assoc timer :last-time now)
         event-command [:add [:events (:event timer)] [nil]]
         set-command [:set [:resources :timer] next-timer]]
-    (if (> ms-diff (:ms timer))
-      [set-command event-command]
-      [])))
+    (when (> ms-diff (:ms timer))
+      [set-command event-command])))
 
 (defsys shout "Shouts every tick"
   {:events :tick}
-  (when-not (empty? events)
-    (println "TICK"))
-  [])
+  (println "TICK"))
 
 (defsys reset-events "Resets events after a step" {}
   [[:set [:events] {}]])
@@ -59,27 +56,23 @@
 (defsys move-head "Moves the snake head"
   {:resources [:head :direction]
    :events :tick}
-  (if (empty? events) ;; TODO This is annoying to have to write
-    []
-    (let [{:keys [head direction]} resources
-          head (map + (directions direction) head)
-          head-id (ew/create-entity world)]
-      [[:set [:resources :head] head]
-       [:set [:components :position head-id] [head]]
-       [:update [:components :body] dec]])))
+  (let [{:keys [head direction]} resources
+        head (map + (directions direction) head)
+        head-id (ew/create-entity world)]
+    [[:set [:resources :head] head]
+     [:set [:components :position head-id] [head]]
+     [:update [:components :body] dec]]))
 
 (defsys move-tail "Moves the snake tail"
   {:resources [:length]
    :components [:id :body]
    :events :tick}
-  (if (empty? events)
-    []
-    (let [length (:length resources)
-          to-remove (->> (filter #(<= length (second %)) components)
-                         (map first))]
-      [[:delete [:components :body] to-remove]
-       [:delete [:components :position] to-remove]
-       [:delete [:components :id] to-remove]]))) ;; TODO This is ridiculous.
+  (let [length (:length resources)
+        to-remove (->> (filter #(<= length (second %)) components)
+                       (map first))]
+    [[:delete [:components :body] to-remove]
+     [:delete [:components :position] to-remove]
+     [:delete [:components :id] to-remove]])) ;; TODO This is ridiculous.
 
 ;; TODO Note if systems return nil channels will be annoyed.
 (defsys display-game ""
@@ -87,20 +80,18 @@
    :events :tick
    :components [:position]}
   ;; Note this might not look so bad without the event business
-  (if (empty? events) []
-      (let [length (get resources :length 2)
-            body-store (get-in world [:components :body])
-            display-char (fn [position]
-                           (if ((set components) position)
-                               \#
-                               \space))]
-        (replace-cursor)
-        (doseq [row (range 10)]
-          (doseq [col (range 10)]
-            (print (display-char [row col])))
-          (println))
-        (flush)
-        [])))
+  (let [length (get resources :length 2)
+        body-store (get-in world [:components :body])
+        display-char (fn [position]
+                       (if ((set components) position)
+                         \#
+                         \space))]
+    (replace-cursor)
+    (doseq [row (range 10)]
+      (doseq [col (range 10)]
+        (print (display-char [row col])))
+      (println))
+    (flush)))
 
 (defn -main [& args]
   (-> (ew/create-world)

@@ -235,8 +235,12 @@
            ~'components (query world# ~(:components bindings))
            ~'resources (get-resources world# ~(:resources bindings))
            ~'events (get-events world# ~(:events bindings))]
-       ;; TODO Make it so if events requested but events are empty, return nil
-       ~@body)))
+       ;; If events requested but those events are empty, return nil
+       (if (and ~(:events bindings) (empty? ~'events))
+         []
+         ;; Return [] if the body of the system returns nil.
+         (or (do ~@body) [])))))
+
 
 (defn find-depths
   "Performs BFS on the systems in a graph to determine their depths.
