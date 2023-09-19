@@ -1,25 +1,14 @@
 (ns test.world
-  (:require [engine.world :as ew :refer :all]
-            [engine.components :as ec]
+  (:require [chaos.engine.world :as ew :refer :all]
+            [chaos.engine.components :as ec]
             [com.stuartsierra.dependency :as dep]
             [clojure.test :refer [deftest is run-tests]]
-            [engine.store :as es]))
+            [chaos.engine.store :as es]))
 
 ;; test add-stage-dependency
 (comment (let [world (-> (create-world) (add-stage-dependency :a :b))]
            (-> world :metadata :stage-graph dep/topo-sort)))
 
-(comment (let [graph (-> (dep/graph)
-                         (dep/depend :b :a)
-                         (dep/depend :c :a)
-                         (dep/depend :d :b)
-                         (dep/depend :d :a)
-                         (dep/depend :e :c)
-                         (dep/depend :f :a)
-                         (dep/depend :f :c)
-                         (dep/depend :f :d))
-               depths (find-depths [:a :b :c :d :e :f] graph)]
-           (println (vals (group-by depths (keys depths))))))
 
 ;; ------- Store Protocol functions --------
 (deftest test-add-component

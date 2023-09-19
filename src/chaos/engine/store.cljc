@@ -1,4 +1,4 @@
-(ns engine.store)
+(ns chaos.engine.store)
 
 (defprotocol Store
   "A protocol for defining common update patterns on data."

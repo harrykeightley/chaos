@@ -1,6 +1,6 @@
 (ns test.components
-  (:require [engine.components :as ec :refer :all]
-            [engine.store :as es]
+  (:require [chaos.engine.components :as ec :refer :all]
+            [chaos.engine.store :as es]
             [clojure.test :refer [deftest is run-tests]]))
 
 ;; ------ SPARSE SET PROTOCOL METHODS --------

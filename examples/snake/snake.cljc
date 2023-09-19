@@ -1,6 +1,6 @@
 (ns snake
-  (:require [engine.world :as ew :refer [defsys]]
-            [engine.utils :refer [millis!]]))
+  (:require [chaos.engine.world :as ew :refer [defsys generate-ids]]
+            [chaos.engine.utils :refer [millis!]]))
 
 ;;----- Helpers
 (defrecord Stopwatch [ms last-time event loops?])
@@ -8,8 +8,6 @@
 (defn create-timer
   ([ms event loops?] (->Stopwatch ms (millis!) event loops?)))
 
-(defn generate-ids [world n]
-  (take n (iterate (partial ew/create-entity world) 0)))
 
 (defn clear-term []
   (print (str (char 27) "[2J")))
@@ -18,7 +16,6 @@
   (print (str (char 27) "[;H")))
 
 ;; ----- Begin game logic
-(defrecord Position [x y])
 (def directions {:up [-1 0] :down [1 0] :left [0 -1] :right [0 1]})
 
 (defsys add-timer "" {}
@@ -36,8 +33,7 @@
     (when (> ms-diff (:ms timer))
       [set-command event-command])))
 
-(defsys shout "Shouts every tick"
-  {:events :tick}
+(defsys shout {:events :tick}
   (println "TICK"))
 
 (defsys reset-events "Resets events after a step" {}

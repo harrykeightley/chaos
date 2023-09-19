@@ -1,8 +1,9 @@
-(ns engine.world
+(ns chaos.engine.world
   (:require [com.stuartsierra.dependency :as dep]
             [clojure.core.async :as async :refer [>! <! <!!]]
-            [engine.components :as ec]
-            [engine.store :as es :refer [Store]]))
+            [chaos.engine.components :as ec]
+            [chaos.engine.utils :refer [resolve-params]]
+            [chaos.engine.store :as es :refer [Store]]))
 
 (defprotocol World
   (get-entities [world]
@@ -229,20 +230,20 @@
   "Creates a macro for specifying systems based on their dependencies, and 
   creates bindings for the all bindings passed in."
   {:clj-kondo/ignore [:unresolved-symbol]} ;; supress linting errors
-  [system-name doc bindings & body]
-  `(defn ~(symbol system-name) ~doc [world#]
-     (let [~'world world#
-           ~'components (query world# ~(:components bindings))
-           ~'resources (get-resources world# ~(:resources bindings))
-           ~'events (get-events world# ~(:events bindings))]
-       ;; If events requested but those events are empty, return nil
-       (if (and ~(:events bindings) (empty? ~'events))
-         []
-         ;; Return [] if the body of the system returns nil.
-         (or (do ~@body) [])))))
+  [system-name & args]
+  (let [[bindings body doc] (resolve-params args)]
+    `(defn ~(symbol system-name) {:doc ~doc} [world#]
+       (let [~'world world#
+             ~'components (query world# ~(:components bindings))
+             ~'resources (get-resources world# ~(:resources bindings))
+             ~'events (get-events world# ~(:events bindings))]
+         ;; If events requested but those events are empty, return nil
+         (if (and ~(:events bindings) (empty? ~'events))
+           []
+           ;; Return [] if the body of the system returns nil.
+           (or (do ~@body) []))))))
 
-
-(defn find-depths
+(defn- find-depths
   "Performs BFS on the systems in a graph to determine their depths.
   Returns a map from systems to depths.
   
@@ -292,7 +293,7 @@
              (do (async/close! channel) world)
              (recur (apply-system-results world (<! channel)) (inc i)))))))
 
-(defn unique-int
+(defn- unique-int
   "Returns an integer that doesn't exist in the given set, `existing`.
 
   To optimize, starts searching from `count`.
@@ -303,3 +304,7 @@
       (recur existing next-entity)
       next-entity)))
 
+(defn generate-ids
+  "Generates a lazy sequence of `n` unique, novel ids from the supplied `world`"
+  [world n]
+  (take n (iterate (partial create-entity world) 0)))

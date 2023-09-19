@@ -1,6 +1,6 @@
-(ns engine.components
-  (:require [engine.store :as es :refer [Store]]
-            [engine.utils :refer [mapper manip-map]]))
+(ns chaos.engine.components
+  (:require [chaos.engine.store :as es :refer [Store]]
+            [chaos.engine.utils :refer [mapper manip-map]]))
 
 (defprotocol SparseSet
   (has-id? [s id]
