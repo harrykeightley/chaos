@@ -74,12 +74,10 @@
      [:delete [:components :position] to-remove]
      [:delete [:components :id] to-remove]])) ;; TODO This is ridiculous.
 
-;; TODO Note if systems return nil channels will be annoyed.
 (defsys display-game ""
   {:resources [:length]
    :events :tick
    :components [:position]}
-  ;; Note this might not look so bad without the event business
   (let [length (get resources :length 2)
         body-store (get-in world [:components :body])
         display-char (fn [position]
