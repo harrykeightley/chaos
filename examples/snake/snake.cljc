@@ -1,13 +1,13 @@
 (ns snake
   (:require [chaos.engine.world :as ew :refer [defsys generate-ids]]
-            [chaos.engine.utils :refer [millis!]]))
+            [chaos.engine.utils :refer [millis!]]
+            [chaos.engine.components :refer [get-components]]))
 
 ;;----- Helpers
 (defrecord Stopwatch [ms last-time event loops?])
 
 (defn create-timer
   ([ms event loops?] (->Stopwatch ms (millis!) event loops?)))
-
 
 (defn clear-term []
   (print (str (char 27) "[2J")))
@@ -59,6 +59,20 @@
      [:set [:components :position head-id] [head]]
      [:update [:components :body] dec]]))
 
+(defsys move-head 
+  {:resources [:head :direction]
+   :events :tick}
+  (let [{:keys [head direction]} resources
+        head (map + (directions direction) head)
+        head-id (ew/create-entity world)]
+    [[:set [:resources :head] head]
+     [:set [:components :position head-id] [head]]
+     [:update [:components :body] dec]]))
+
+(defsys log-body
+  {:components [:id :body]}
+  (println (-> world :component-stores :body get-components)))
+
 (defsys move-tail "Moves the snake tail"
   {:resources [:length]
    :components [:id :body]
@@ -74,10 +88,9 @@
   {:resources [:length]
    :events :tick
    :components [:position]}
-  (let [length (get resources :length 2)
-        body-store (get-in world [:components :body])
+  (let [positions (set (map first components))
         display-char (fn [position]
-                       (if ((set components) position)
+                       (if (positions position)
                          \#
                          \space))]
     (replace-cursor)
@@ -96,7 +109,10 @@
       (ew/add-system-dependency shout tick!)
       (ew/add-system :post-step reset-events)
       (ew/add-systems [move-head move-tail])
-      (ew/add-system-dependency move-tail move-head)
+      (ew/add-system-dependency move-head tick!)
+      (ew/add-system log-body)
+      (ew/add-system-dependency log-body move-head)
+      (ew/add-system-dependency move-tail log-body)
       (ew/add-system :display display-game)
       (ew/play)))
 

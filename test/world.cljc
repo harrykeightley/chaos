@@ -9,7 +9,6 @@
 (comment (let [world (-> (create-world) (add-stage-dependency :a :b))]
            (-> world :metadata :stage-graph dep/topo-sort)))
 
-
 ;; ------- Store Protocol functions --------
 (deftest test-add-component
   (let [world (-> (create-world)
@@ -54,6 +53,16 @@
         components (-> world :component-stores :position (ec/get-components))]
     (is (every? #{2 4 6 8} components))))
 
+(deftest test-update-all-components
+  (let [world (-> (create-world)
+                  (es/adds [:components :position 1] [1])
+                  (es/adds [:components :position 2] [2])
+                  (es/adds [:components :position 3] [3])
+                  (es/adds [:components :position 4] [4])
+                  (es/updates [:components :position] dec))
+        components (-> world :component-stores :position (ec/get-components))]
+    (is (every? #{0 1 2 3} components))))
+
 (deftest test-delete-component
   (let [world (-> (create-world)
                   (es/adds [:components :position 1] [[1 2]])
@@ -90,6 +99,12 @@
 (defsys shout "" {}
   (println "AAAA"))
 
+(defsys add-components {}
+  [[:add [:components :test] [[1 1] [2 2] [3 3]]]])
+
+(defsys dec-components {}
+  [[:update [:components :test] dec]])
+
 (comment (let [systems [println]
                stage :update
                world (ew/create-world)
@@ -97,6 +112,19 @@
                           (concat systems)
                           (assoc-in world [:systems stage]))]
            world))
+
+;; TODO Updates applied through defsys are not working properly.
+;; 
+(deftest test-defsys-update
+  (let [world (-> (create-world)
+                  (ew/add-system :start-up add-components)
+                  (ew/add-system dec-components)
+                  (ew/apply-stage :start-up)
+                  (#((do (println %) %)))
+                  ; (ew/step)
+                  )
+        components (-> world :component-stores :test ec/get-components)]
+    (is (every? #{0 1 2} components))))
 
 (deftest test-add-system-with-explicit-stage
   (let [world (-> (create-world) (ew/add-system :start-up println))

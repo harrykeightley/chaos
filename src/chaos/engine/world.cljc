@@ -229,7 +229,7 @@
 (defmacro defsys
   "Creates a macro for specifying systems based on their dependencies, and 
   creates bindings for the all bindings passed in."
-  {:clj-kondo/ignore [:unresolved-symbol]} ;; supress linting errors
+  {:clj-kondo/ignore [:unresolved-symbol :type-mismatch]} ;; supress linting errors
   [system-name & args]
   (let [[bindings body doc] (resolve-params args)]
     `(defn ~(symbol system-name) {:doc ~doc} [world#]
