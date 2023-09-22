@@ -59,20 +59,6 @@
      [:set [:components :position head-id] [head]]
      [:update [:components :body] dec]]))
 
-(defsys move-head 
-  {:resources [:head :direction]
-   :events :tick}
-  (let [{:keys [head direction]} resources
-        head (map + (directions direction) head)
-        head-id (ew/create-entity world)]
-    [[:set [:resources :head] head]
-     [:set [:components :position head-id] [head]]
-     [:update [:components :body] dec]]))
-
-(defsys log-body
-  {:components [:id :body]}
-  (println (-> world :component-stores :body get-components)))
-
 (defsys move-tail "Moves the snake tail"
   {:resources [:length]
    :components [:id :body]
@@ -110,9 +96,7 @@
       (ew/add-system :post-step reset-events)
       (ew/add-systems [move-head move-tail])
       (ew/add-system-dependency move-head tick!)
-      (ew/add-system log-body)
-      (ew/add-system-dependency log-body move-head)
-      (ew/add-system-dependency move-tail log-body)
+      (ew/add-system-dependency move-tail move-head)
       (ew/add-system :display display-game)
       (ew/play)))
 

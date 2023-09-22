@@ -1,16 +1,16 @@
 (ns chaos.engine.utils)
 
 (defn map-keys
-  "Applies the function `f` to the value of keys `k` within `m` and returns the 
+  "Applies the function `f` to the value of keys `ks` within `m` and returns the 
   resulting map."
-  [m k f]
-  (let [m (select-keys m k)]
+  [m ks f]
+  (let [m (select-keys m ks)]
     (zipmap (keys m) (map f (vals m)))))
 
 (defn manip-map
   "Really just `map-keys` but also returns the non-modified keys."
-  [m k f]
-  (merge m (map-keys m k f)))
+  [m ks f]
+  (merge m (map-keys m ks f)))
 
 (defmacro mapper
   "Turns its passed arguments into a map of those keywordized arguments to their 
