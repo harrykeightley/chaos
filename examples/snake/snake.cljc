@@ -1,9 +1,9 @@
 (ns snake
   (:require [chaos.engine.world :as ew :refer [defsys generate-ids]]
-            [chaos.engine.utils :refer [millis!]]
             [chaos.plugins.core :refer [add-core-plugins]]
             [chaos.plugins.timer :as timer]
-            [chaos.engine.components :refer [get-components]]))
+            [chaos.engine.components :refer [get-components]]
+            [chaos.engine.components :as ec]))
 
 ;;----- Helpers
 (defn clear-term []
@@ -23,9 +23,6 @@
 (defsys shout {:events :tick}
   (println "TICK"))
 
-(defsys reset-events "Resets events after a step" {}
-  [[:set [:events] {}]])
-
 (defsys add-snake "Adds the initial snake components" {}
   (let [length 2
         ids (generate-ids world length)]
@@ -34,24 +31,32 @@
      [:add [:resources :direction] :down]
      [:add [:components :position] (map vector ids [[1 1] [2 1]])]
      ;; Reversing ids so that tail positions have higher indicies
-     [:add [:components :body] (map vector (reverse ids) (range 1 (+ 1 length)))]]))
+     [:add [:components :body] (map vector (reverse ids) (range 1 (+ length 1)))]]))
 
 (defsys move-head "Moves the snake head"
   {:resources [:head :direction]
    :events :tick}
+  (println "BODY" (-> world :component-stores :body ec/get-items))
   (let [{:keys [head direction]} resources
         head (map + (directions direction) head)
         head-id (ew/create-entity world)]
     [[:set [:resources :head] head]
      [:set [:components :position head-id] [head]]
-     [:update [:components :body] dec]]))
+     [:set [:components :body head-id] [0]]
+     [:update [:components :body] inc]]))
+
+(defsys log-body
+  {:resources [:length]
+   :components [:body]
+   :events :tick}
+  (println "Length:" resources "Body:" components))
 
 (defsys move-tail "Moves the snake tail"
   {:resources [:length]
    :components [:id :body]
    :events :tick}
   (let [length (:length resources)
-        to-remove (->> (filter #(<= length (second %)) components)
+        to-remove (->> (filter #(< length (second %)) components)
                        (map first))]
     [[:delete [:components :body] to-remove]
      [:delete [:components :position] to-remove]
@@ -66,7 +71,7 @@
                        (if (positions position)
                          \#
                          \space))]
-    (replace-cursor)
+    ; (replace-cursor)
     (doseq [row (range 10)]
       (doseq [col (range 10)]
         (print (display-char [row col])))
@@ -78,14 +83,15 @@
       add-core-plugins
       (ew/add-system :start-up add-timer)
       (ew/add-system :start-up add-snake)
-      (ew/add-system :update tick!)
-      (ew/add-system :update shout)
+      (ew/add-system :update tick!) ;; explicitly add tick! to :update stage.
+      (ew/add-system shout) ;; implicitly add shout to :update stage.
       (ew/add-system-dependency shout tick!)
-      (ew/add-system :post-step reset-events)
       (ew/add-systems [move-head move-tail])
       (ew/add-system-dependency move-head tick!)
       (ew/add-system-dependency move-tail move-head)
       (ew/add-system :display display-game)
+      (ew/add-system :display log-body)
+      (ew/add-system-dependency log-body display-game)
       ew/play))
 
 

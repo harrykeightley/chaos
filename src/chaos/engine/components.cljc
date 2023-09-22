@@ -87,7 +87,7 @@
 ;; Applies `f` to the all ids at `path`, or all components if path is nil.
   (updates [store path f]
     (if (empty? path)
-      (update-in store [:components] (partial map f))
+      (update store :components (partial mapv f))
       (let [reducer (fn [store id]
                       (insert store id (f (get-component store id))))
             ids (filter (partial has-id? store) path)]

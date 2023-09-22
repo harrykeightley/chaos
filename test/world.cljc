@@ -93,10 +93,10 @@
     (is (= 1 (count events)))))
 
 ;; ------------- System and Stage Resolution ------------
-(defsys create-component "" {}
+(defsys create-component {}
   [[:add [:components :test 1] [1]]])
 
-(defsys shout "" {}
+(defsys shout {}
   (println "AAAA"))
 
 (defsys add-components {}
@@ -120,9 +120,7 @@
                   (ew/add-system :start-up add-components)
                   (ew/add-system dec-components)
                   (ew/apply-stage :start-up)
-                  (#((do (println %) %)))
-                  ; (ew/step)
-                  )
+                  (ew/step))
         components (-> world :component-stores :test ec/get-components)]
     (is (every? #{0 1 2} components))))
 
