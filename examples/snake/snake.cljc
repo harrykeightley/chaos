@@ -36,7 +36,6 @@
 (defsys move-head "Moves the snake head"
   {:resources [:head :direction]
    :events :tick}
-  (println "BODY" (-> world :component-stores :body ec/get-items))
   (let [{:keys [head direction]} resources
         head (map + (directions direction) head)
         head-id (ew/create-entity world)]
@@ -71,7 +70,7 @@
                        (if (positions position)
                          \#
                          \space))]
-    ; (replace-cursor)
+    (replace-cursor)
     (doseq [row (range 10)]
       (doseq [col (range 10)]
         (print (display-char [row col])))
@@ -90,8 +89,8 @@
       (ew/add-system-dependency move-head tick!)
       (ew/add-system-dependency move-tail move-head)
       (ew/add-system :display display-game)
-      (ew/add-system :display log-body)
-      (ew/add-system-dependency log-body display-game)
+      ; (ew/add-system :display log-body)
+      ; (ew/add-system-dependency log-body display-game)
       ew/play))
 
 
