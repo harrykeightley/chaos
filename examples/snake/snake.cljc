@@ -1,14 +1,11 @@
 (ns snake
   (:require [chaos.engine.world :as ew :refer [defsys generate-ids]]
             [chaos.engine.utils :refer [millis!]]
+            [chaos.plugins.core :refer [add-core-plugins]]
+            [chaos.plugins.timer :as timer]
             [chaos.engine.components :refer [get-components]]))
 
 ;;----- Helpers
-(defrecord Stopwatch [ms last-time event loops?])
-
-(defn create-timer
-  ([ms event loops?] (->Stopwatch ms (millis!) event loops?)))
-
 (defn clear-term []
   (print (str (char 27) "[2J")))
 
@@ -19,19 +16,9 @@
 (def directions {:up [-1 0] :down [1 0] :left [0 -1] :right [0 1]})
 
 (defsys add-timer "" {}
-  [[:add [:resources :timer] (create-timer 1000 :tick true)]])
+  [[:add [:resources :timer] (timer/create-timer 1000 :tick nil true)]])
 
-;; Note: I should add something like this to the library
-(defsys tick! "Updates the timer"
-  {:resources [:timer]}
-  (let [timer (:timer resources)
-        now (millis!)
-        ms-diff (abs (- now (:last-time timer)))
-        next-timer (assoc timer :last-time now)
-        event-command [:add [:events (:event timer)] [nil]]
-        set-command [:set [:resources :timer] next-timer]]
-    (when (> ms-diff (:ms timer))
-      [set-command event-command])))
+(timer/create-timer-resource-system tick! :timer)
 
 (defsys shout {:events :tick}
   (println "TICK"))
@@ -88,6 +75,7 @@
 
 (defn -main [& args]
   (-> (ew/create-world)
+      add-core-plugins
       (ew/add-system :start-up add-timer)
       (ew/add-system :start-up add-snake)
       (ew/add-system :update tick!)
@@ -98,6 +86,6 @@
       (ew/add-system-dependency move-head tick!)
       (ew/add-system-dependency move-tail move-head)
       (ew/add-system :display display-game)
-      (ew/play)))
+      ew/play))
 
 
