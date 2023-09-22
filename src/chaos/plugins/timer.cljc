@@ -19,7 +19,9 @@
     timer))
 
 (defmacro create-timer-resource-system
-  "Creates a system which updates the timer at the supplied `resource-name`."
+  "Creates a system which updates the timer at the supplied `resource-name`.
+  
+  e.g. `(create-timer-resource-system tick! :timer)`"
   [system-name resource-name]
   `(defsys ~(symbol system-name)
      {:resources [~resource-name]}
@@ -31,14 +33,16 @@
          [set-command# event-command#]))))
 
 (defmacro create-timer-system
-  "Creates a system which updates all timers at the supplied `component-name`."
+  "Creates a system which updates all timers at the supplied `component-name`.
+  
+  e.g. `(create-timer-system tick! :timer)`"
   [system-name component-name]
   `(defsys ~(symbol system-name)
      {:components [~component-name]}
      (let [timers# (->> (map first ~'components) (filter should-emit?))
            event-groups# (->> timers#
-                             (map #(mapv % [:event :payload]))
-                             (group-by first))
+                              (map #(mapv % [:event :payload]))
+                              (group-by first))
            group->command# #([:add [:events (first (first %))] (map second %)])
            event-commands# (map group->command# (vals event-groups#))]
        (conj event-commands#
