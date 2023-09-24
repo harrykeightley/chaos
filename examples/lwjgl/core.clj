@@ -9,22 +9,14 @@
 (defsys hello-world {}
   (println (str "Hello LWJGL " (Version/getVersion) "!")))
 
-(defsys init-GLFW {}
+(defsys create-GL-capabilities {}
   ; This line is critical for LWJGL's interoperation with GLFW's
   ; OpenGL context, or any context that is managed externally.
   ; LWJGL detects the context that is current in the current thread,
   ; creates the GLCapabilities instance and makes the OpenGL
   ; bindings available for use.
   (GL/createCapabilities)
-
-  ; Setup an error callback. The default implementation
-  ; will print the error message in System.err.
-  (-> (GLFWErrorCallback/createPrint System/err) (.set))
-
-  ; Initialize GLFW. Most GLFW functions will not work before doing this.
-  (when (not (GLFW/glfwInit))
-    (throw (IllegalStateException. "Unable to initialize GLFW")))
-  [])
+  nil)
 
 (defsys clean-up {:resources [:window]}
   (let [window (:window resources)]
@@ -37,6 +29,14 @@
     (-> (GLFW/glfwSetErrorCallback nil) (.free))))
 
 (defn create-window [width height title]
+  ; Setup an error callback. The default implementation
+  ; will print the error message in System.err.
+  (-> (GLFWErrorCallback/createPrint System/err) (.set))
+
+  ; Initialize GLFW. Most GLFW functions will not work before doing this.
+  (when (not (GLFW/glfwInit))
+    (throw (IllegalStateException. "Unable to initialize GLFW")))
+
   ; Configure GLFW
   (GLFW/glfwDefaultWindowHints)                             ; optional, the current window hints are already the default
   (GLFW/glfwWindowHint GLFW/GLFW_VISIBLE GLFW/GLFW_FALSE)   ; the window will stay hidden after creation
@@ -105,14 +105,14 @@
 
 (defn -main [& args]
   (-> (create-world)
-      ;; Makes the supplied stages run in single-threaded mode (for GLFW)
+      ;; Force the supplied stages run on the main thread
       (assoc-in [:metadata :mc-stages] #{:start-up :render :tear-down})
       (add-system :start-up hello-world)
       (add-system :start-up init-window)
-      (add-system :start-up init-GLFW)
+      (add-system :start-up create-GL-capabilities)
       (add-system :render draw)
       (add-system :post-step detect-exit)
       (add-system :tear-down clean-up)
-      (add-system-dependency init-GLFW init-window)
+      (add-system-dependency create-GL-capabilities init-window)
       (play)))
 
