@@ -3,14 +3,17 @@
         org.lwjgl/lwjgl          {:mvn/version "3.3.2"}
         org.lwjgl/lwjgl-glfw     {:mvn/version "3.3.2"}
         org.lwjgl/lwjgl-opengl   {:mvn/version "3.3.2"}
-        com.stuartsierra/dependency {:mvn/version "1.0.0"}}
+        com.stuartsierra/dependency {:mvn/version "1.0.0"}
+        chaos/chaos {:local/root "../.."}
+        snake/snake {:local/root "../snake"}}
 
+ :paths ["."]
  :aliases {:macos-x64
            {:extra-deps {org.lwjgl/lwjgl$natives-macos        {:mvn/version "3.3.2"}
                          org.lwjgl/lwjgl-glfw$natives-macos   {:mvn/version "3.3.2"}
                          org.lwjgl/lwjgl-opengl$natives-macos {:mvn/version "3.3.2"}}
             :jvm-opts ["-XstartOnFirstThread"]
-            :main-opts ["-m", "engine.core"]}
+            :main-opts ["-m", "core"]}
 
            :macos-arm64
            {:extra-deps {org.lwjgl/lwjgl$natives-macos-arm64        {:mvn/version "3.3.2"}

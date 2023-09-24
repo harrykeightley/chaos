@@ -59,7 +59,8 @@
     "Runs the world until the :exit flag is set within its metadata"))
 
 (declare find-depths)
-(declare apply-system-batch)
+(declare apply-systems)
+(declare apply-systems-single-threaded)
 (declare forward-to-components)
 (declare unique-int)
 
@@ -147,8 +148,12 @@
           depths (find-depths systems graph)
           batched-stages (->> (keys depths)
                               (group-by depths)
-                              (vals))]
-      (reduce apply-system-batch world batched-stages)))
+                              (vals))
+          single-threaded-stages (get metadata :mc-stages #{})
+          f (if (single-threaded-stages stage)
+              apply-systems-single-threaded
+              apply-systems)]
+      (reduce f world batched-stages)))
 
   (step [world]
     (let [sorted-stages (->> (get-in world [:metadata :stage-graph] (dep/graph))
@@ -281,7 +286,7 @@
                          (f world path values)))]
     (reduce apply-result world results)))
 
-(defn- apply-system-batch
+(defn- apply-systems
   "Applies a sequence of independent systems and return the resulting world."
   [world batch]
   (let [channel (async/chan)]
@@ -292,6 +297,13 @@
            (if (>= i (count batch))
              (do (async/close! channel) world)
              (recur (apply-system-results world (<! channel)) (inc i)))))))
+
+(defn- apply-systems-single-threaded
+  "Applies a sequence of systems on the main thread and returns the resulting world."
+  [world batch]
+  (letfn [(reducer [world system]
+            (apply-system-results world (system world)))]
+    (reduce reducer world batch)))
 
 (defn- unique-int
   "Returns an integer that doesn't exist in the given set, `existing`.

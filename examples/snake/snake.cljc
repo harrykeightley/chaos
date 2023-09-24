@@ -2,7 +2,6 @@
   (:require [chaos.engine.world :as ew :refer [defsys generate-ids]]
             [chaos.plugins.core :refer [add-core-plugins]]
             [chaos.plugins.timer :as timer]
-            [chaos.engine.components :refer [get-components]]
             [chaos.engine.components :as ec]
             [clojure.string :as str]))
 
