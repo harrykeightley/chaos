@@ -140,9 +140,9 @@
     (println (str/join (repeat (+ 2 cols) \#)))
     (flush)))
 
-(defn -main [& args]
-  (-> (ew/create-world)
-      add-core-plugins
+;; Just grouping this into a plugin to be used in other examples.
+(defn add-snake-plugin [world]
+  (-> world
       (ew/add-system :start-up add-timer)
       (ew/add-system :start-up add-snake)
       (ew/add-system :start-up add-bounds)
@@ -157,7 +157,12 @@
       (ew/add-system-dependency move-head tick!)
       (ew/add-system-dependency food-collision move-head)
       (ew/add-system-dependency eat food-collision)
-      (ew/add-system-dependency move-tail eat)
+      (ew/add-system-dependency move-tail eat)))
+
+(defn -main [& args]
+  (-> (ew/create-world)
+      add-core-plugins
+      add-snake-plugin
       (ew/add-system :display display-game)
       (ew/add-system :log log-food)
       (ew/add-system :log log-body)
