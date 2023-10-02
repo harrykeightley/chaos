@@ -1,0 +1,4 @@
+{:deps {thheller/shadow-cljs {:mvn/version "2.25.3"}
+        chaos/chaos {:local/root "../.."}
+        snake/snake {:local/root "../snake"}}
+ :paths ["src"]}

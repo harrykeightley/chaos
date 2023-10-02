@@ -5,7 +5,7 @@
             [chaos.engine.components :as ec]
             [clojure.string :as str]))
 
-;;----- Helpers
+;; ----- Helpers
 (defn clear-term []
   (print (str (char 27) "[2J")))
 
@@ -148,13 +148,13 @@
       (ew/add-system :start-up add-bounds)
       (ew/add-system :start-up add-food)
       (ew/add-system-dependency add-food add-snake)
-      (ew/add-system :update tick!)
+      (ew/add-system :pre-step tick!)
       (ew/add-system eat)
       (ew/add-system food-collision)
       (ew/add-system spawn-new-food)
       (ew/add-system-dependency spawn-new-food eat)
       (ew/add-systems [move-head move-tail])
-      (ew/add-system-dependency move-head tick!)
+      ; (ew/add-system-dependency move-head tick!)
       (ew/add-system-dependency food-collision move-head)
       (ew/add-system-dependency eat food-collision)
       (ew/add-system-dependency move-tail eat)))

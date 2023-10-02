@@ -1,6 +1,5 @@
 (ns lwjgl
   (:require [clojure.main]
-            [snake :refer [add-snake-plugin]]
             [chaos.engine.utils :as utils]
             [chaos.engine.world :as ew :refer [create-world add-system add-system-dependency defsys play]])
   (:import [org.lwjgl.glfw Callbacks GLFW GLFWErrorCallback GLFWKeyCallbackI]
@@ -49,7 +48,7 @@
     (when (zero? window)
       (throw (RuntimeException. "Failed to create the GLFW window")))
 
-; Get the thread stack and push a new frame
+    ; Get the thread stack and push a new frame
     (let [stack (MemoryStack/stackPush)
           p-width (.mallocInt stack 1)
           p-height (.mallocInt stack 1)]
