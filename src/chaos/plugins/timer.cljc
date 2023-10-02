@@ -1,6 +1,8 @@
 (ns chaos.plugins.timer
   (:require [chaos.engine.utils :refer [millis!]]
-            [chaos.engine.world :refer [defsys]]))
+            [chaos.engine.world :refer [defsys]]
+            [chaos.engine.utils :as utils])
+  #?(:cljs (:require-macros [chaos.plugins.timer])))
 
 (defrecord Timer [ms last-time event payload loops?])
 
@@ -32,6 +34,7 @@
        (when (should-emit? timer#)
          [set-command# event-command#]))))
 
+
 (defmacro create-timer-system
   "Creates a system which updates all timers at the supplied `component-name`.
   
@@ -41,11 +44,13 @@
      {:components [~component-name]}
      (let [timers# (->> (map first ~'components) (filter should-emit?))
            event-groups# (->> timers#
-                              (map #(mapv % [:event :payload]))
-                              (group-by first))
-           group->command# #([:add [:events (first (first %))] (map second %)])
-           event-commands# (map group->command# (vals event-groups#))]
-       (conj event-commands#
+                              (map #(mapv (into {} %) [:event :payload]))
+                              (group-by first)
+                              (#(utils/map-keys % (partial mapv second))))
+           group->command# #(vector :add [:events (first %)] (second %))
+           event-commands# (mapv group->command# (seq event-groups#))]
+       (conj (or event-commands# [])
              [:update [:components ~component-name] update-timer]))))
 
+(macroexpand '(create-timer-system tick! :timer))
 

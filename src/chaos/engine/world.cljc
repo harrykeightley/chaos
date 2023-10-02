@@ -1,9 +1,10 @@
 (ns chaos.engine.world
   (:require [com.stuartsierra.dependency :as dep]
-            [clojure.core.async :as async :refer [>! <! <!!]]
+            [clojure.core.async :as async :refer [>! <!]]
             [chaos.engine.components :as ec]
             [chaos.engine.utils :refer [resolve-params]]
-            [chaos.engine.store :as es :refer [Store]]))
+            [chaos.engine.store :as es :refer [Store]])
+  #?(:cljs (:require-macros [chaos.engine.world])))
 
 (defprotocol World
   (get-entities [world]
@@ -153,7 +154,11 @@
           f (if (single-threaded-stages stage)
               apply-systems-single-threaded
               apply-systems)]
-      (reduce f world batched-stages)))
+      ;; Have to make entirely single threaded in cljs apps?
+      (reduce #?(:cljs apply-systems-single-threaded
+                 :default f)
+              world
+              batched-stages)))
 
   (step [world]
     (let [sorted-stages (->> (get-in world [:metadata :stage-graph] (dep/graph))
@@ -270,20 +275,22 @@
                              next-node)]
             (recur (reduce conj (pop queue) next-nodes) (assoc result node depth)))))))
 
+(def commands {:add es/adds
+               :set es/sets
+               :update es/updates
+               :delete es/deletes})
+
 (defn- apply-system-results
   "Takes the results of running a system and applies them to the world. "
   [world results]
   (let [apply-result (fn [world result]
                        (let [[k path values] result
-                             f (case k
-                                 :add es/adds
-                                 :set es/sets
-                                 :update es/updates
-                                 :delete es/deletes
-                                 (do (println "Invalid command:" k)
-                                     #(first %&)))]
-                         ;; TODO emit a raw event of the results just processed.
-                         (f world path values)))]
+                             ;; Appends each raw result as an event for plugins
+                             world (es/adds world [:events :chaos/raw-results] result)]
+                         (if (contains? commands k)
+                           ((commands k) world path values)
+                           (do (println "Invalid command:" k)
+                               world))))]
     (reduce apply-result world results)))
 
 (defn- apply-systems
@@ -293,10 +300,10 @@
     (doseq [system batch]
       (async/go (>! channel (system world))))
     ;; Blocking take from the result thread
-    (<!! (async/go-loop [world world i 0]
-           (if (>= i (count batch))
-             (do (async/close! channel) world)
-             (recur (apply-system-results world (<! channel)) (inc i)))))))
+    (async/<!! (async/go-loop [world world i 0]
+                 (if (>= i (count batch))
+                   (do (async/close! channel) world)
+                   (recur (apply-system-results world (<! channel)) (inc i)))))))
 
 (defn- apply-systems-single-threaded
   "Applies a sequence of systems on the main thread and returns the resulting world."

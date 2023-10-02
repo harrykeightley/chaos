@@ -1,11 +1,19 @@
-(ns chaos.engine.utils)
+(ns chaos.engine.utils
+  #?(:cljs (:require-macros [chaos.engine.utils])))
 
 (defn map-keys
   "Applies the function `f` to the value of keys `ks` within `m` and returns the 
   resulting map."
-  [m ks f]
-  (let [m (select-keys m ks)]
-    (zipmap (keys m) (map f (vals m)))))
+  ([m ks f]
+   (map-keys (select-keys m ks) f))
+  ([m f]
+   (zipmap (keys m) (map f (vals m)))))
+
+(defn debug!
+  "Prints the supplied value and returns it."
+  [x]
+  (println x)
+  x)
 
 (defn manip-map
   "Really just `map-keys` but also returns the non-modified keys."
@@ -21,7 +29,7 @@
 (defn millis!
   "Returns the ms passed since Jan 1 1970."
   []
-  #?(:cljs (-> (.. js/Date now) (/ 1000) (.floor js/Math))
+  #?(:cljs (->> (.. js/Date now) (.floor js/Math))
      :default (inst-ms (java.time.Instant/now))))
 
 (defn resolve-params
