@@ -1,10 +1,9 @@
 (ns app
   (:require ["three" :as three]
-            [goog.object]
             [snake :refer [add-snake-plugin]]
-            [clojure.core.async :as async :refer [go]]
             [chaos.plugins.core :refer [add-core-plugins]]
             [chaos.plugins.timer :as timer]
+            [chaos.engine.utils :as utils]
             [chaos.engine.world :as chaos :refer [create-world
                                                   defsys
                                                   add-system
@@ -22,32 +21,56 @@
     (.setSize renderer w h)
     (.. js/document -body (appendChild (.-domElement renderer)))
     ;; Move camera back
-    (set! (.. camera -position -z) 5)
-    (println "Cam Z:" (.. camera -position -z))
+    (set! (.. camera -position -z) 16)
     (println renderer)
 
     [[:add [:resources :camera] camera]
      [:add [:resources :scene] (three/Scene.)]
      [:add [:resources :renderer] renderer]]))
 
-(defsys add-cube {:resources [:scene]}
-  (let [scene (:scene resources)
-        geometry (three/BoxGeometry. 1 1 1)
-        material (three/MeshBasicMaterial. #js {:color 0x00ff00})
-        cube (three/Mesh. geometry material)]
-    (.add scene cube)
-    []))
+(defn create-cube [size colour]
+  (let [geometry (three/BoxGeometry. size size size)
+        material (three/MeshBasicMaterial. #js {:color colour})]
+    (three/Mesh. geometry material)))
 
-(defsys draw-scene! {:resources [:renderer :scene :camera]
-                     :events :tick}
-  (println "Drawing...")
-  (let [{:keys [:renderer :scene :camera]} resources
-        render-scene #(.render renderer scene camera)]
-    (.. js/window (requestAnimationFrame render-scene))
-    []))
+(defsys add-body-cubes
+  {:components [:id :position :body]
+   :events :tick}
+  (let [ids (map first components)
+        cubes (map vector ids (repeatedly (partial create-cube 1 0x00ff00)))]
+    [[:add [:components :cube] cubes]]))
 
-(defsys shout! {}
-  (println js/window))
+(defsys add-food-cubes
+  {:components [:id :position :food]
+   :events :tick}
+  (let [ids (map first components)
+        cubes (map vector ids (repeatedly (partial create-cube 0.5 0x00ffff)))]
+    [[:add [:components :cube] cubes]]))
+
+(defsys align-cubes
+  {:resources [:bounds]
+   :components [:cube :position]
+   :events :tick}
+  (let [[rows cols] (:bounds resources)]
+    (doseq [[cube [row col]] components]
+      (set! (.. cube -position -x) col)
+      (set! (.. cube -position -y) (- rows row)))))
+
+(defsys reset-cubes
+  {:events :tick
+   :components [:id :cube]}
+  [[:delete [:components :cube] (mapv first components)]])
+
+(defsys draw-scene!
+  {:resources [:renderer :scene :camera]
+   :components [:cube]
+   :events :tick}
+  (let [{:keys [:renderer :scene :camera]} resources]
+    (.clear scene)
+    (doseq [cube components]
+      (.add scene (first cube)))
+    (.render renderer scene camera)
+    []))
 
 (defsys capture-key-down {}
   (let [raw (atom [])
@@ -57,41 +80,63 @@
     (.addEventListener js/window "keydown" add-event)
     [[:add [:resources :key-down-events] raw]]))
 
+(def actions {"ArrowDown" [:move :down]
+              "ArrowLeft" [:move :left]
+              "ArrowRight" [:move :right]
+              "ArrowUp" [:move :up]
+              "Escape" [:exit nil]})
+
+(defn get-action [event]
+  (actions (.-code event)))
+
 (defsys handle-key-down {:resources [:key-down-events]}
-  (println "KEYS" (:key-down-events resources)))
+  (let [key-down-events (:key-down-events resources)
+        valid (filter get-action @key-down-events)
+        raw-actions (map get-action valid)
+        actions (utils/map-keys (group-by first raw-actions) last)
+        events (mapv (fn [[event payload]]
+                       [:add [:events event] payload])
+                     actions)
+        key-down-events (reset! (:key-down-events resources) [])]
+    events))
 
-;; ---- Exit Timer ----
-(defsys add-exit-timer {}
-  (let [id (chaos/create-entity world)
-        timer (timer/create-timer 5000 :exit true)]
-    [[:add [:components :timer id] [timer]]]))
+(defsys handle-move {:events :move}
+  [[:set [:resources :direction] (last events)]])
 
-(timer/create-timer-system pass-time :timer)
-
-(defsys exit-after-5 {:events :exit}
-  (println "Exiting")
+(defsys handle-exit {:events :exit}
   [[:set [:metadata :exit] true]])
+
+(defn run-world [world]
+  (let [world (chaos/step world)]
+    (if (chaos/finished? world)
+      (chaos/apply-stage world :tear-down)
+      (js/requestAnimationFrame #(run-world world)))))
 
 (defn ^:dev/after-load run []
   (-> (create-world)
       add-core-plugins
       add-snake-plugin
       (add-system :start-up setup-threejs)
-      (add-system :start-up add-cube)
-      (add-system-dependency add-cube setup-threejs)
+      (add-system :pre-render reset-cubes)
+      (add-system :pre-render add-body-cubes)
+      (add-system :pre-render add-food-cubes)
+      (add-system :pre-render align-cubes)
+      (add-system-dependency add-body-cubes reset-cubes)
+      (add-system-dependency add-food-cubes reset-cubes)
+      (add-system-dependency align-cubes add-body-cubes)
+      (add-system-dependency align-cubes add-food-cubes)
       (add-system :render draw-scene!)
 
-      ;; Exiting after 5 secs
-      (add-system :start-up add-exit-timer)
-      (add-system :pre-step pass-time)
-      (add-system exit-after-5)
-
-      ; (add-system shout!)
-      ; (add-system handle-key-down)
+      ;; Input handling
       (add-system :start-up capture-key-down)
+      (add-system :pre-step handle-key-down)
+      (add-system handle-move)
+      (add-system handle-exit)
 
       (add-stage-dependency :render :update)
-      chaos/play))
+      (add-stage-dependency :render :pre-render)
+      (chaos/apply-stage :start-up)
+      run-world))
 
 (defn init []
   (println "Refresh.")

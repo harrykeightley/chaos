@@ -115,6 +115,9 @@
     [[:add [:components :food id] [:food]]
      [:add [:components :position id] [food-position]]]))
 
+(defsys accelerate {:events :tick}
+  [[:update [:resource :timer] #(update % :ms dec)]])
+
 (defsys display-game
   {:resources [:length :bounds]
    :events :tick
@@ -150,6 +153,7 @@
       (ew/add-system-dependency add-food add-snake)
       (ew/add-system :pre-step tick!)
       (ew/add-system eat)
+      (ew/add-system accelerate)
       (ew/add-system food-collision)
       (ew/add-system spawn-new-food)
       (ew/add-system-dependency spawn-new-food eat)

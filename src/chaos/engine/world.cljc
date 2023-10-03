@@ -56,6 +56,9 @@
     
     Equivalent to running all stages.")
 
+  (finished? [world]
+    "Returns true iff the world should exit.")
+
   (play [world]
     "Runs the world until the :exit flag is set within its metadata"))
 
@@ -119,21 +122,22 @@
     (let [length (fn [component] (-> (component-stores component) :n))
           components (filter component-stores required-component-types)
           sorted-components (sort-by length components)]
-      (if (empty? components)
-        nil
-        (let [ids (->> (first sorted-components) ;; component-type with smallest count
-                       component-stores
-                       ec/get-items
-                       (map first))
-              other-stores (map component-stores (rest sorted-components))
-              reducer (fn [ids store]
-                        (filter #(ec/has-id? store %) ids))
-              matching-ids (reduce reducer ids other-stores)
-              ;; Build n-tuples of components based on original ordering in 
-              ;; required-component-types
-              stores (map component-stores components)
-              build-tuple (fn [id] (map #(ec/get-component % id) stores))]
-          (map build-tuple matching-ids)))))
+      (cond
+        (empty? components) nil
+        (not= (count components) (count required-component-types)) nil
+        :else (let [ids (->> (first sorted-components) ;; component-type with smallest count
+                             component-stores
+                             ec/get-items
+                             (map first))
+                    other-stores (map component-stores (rest sorted-components))
+                    reducer (fn [ids store]
+                              (filter #(ec/has-id? store %) ids))
+                    matching-ids (reduce reducer ids other-stores)
+                    ;; Build n-tuples of components based on original ordering in 
+                    ;; required-component-types
+                    stores (map component-stores components)
+                    build-tuple (fn [id] (map #(ec/get-component % id) stores))]
+                (map build-tuple matching-ids)))))
 
   (get-events [_ event-type]
     (get events event-type))
@@ -171,12 +175,15 @@
           (#(reduce apply-stage % sorted-stages))
           (apply-stage :post-step))))
 
+  (finished? [world]
+    (contains? metadata :exit))
+
   (play [world]
     (-> world
         (apply-stage :start-up)
         ;; TODO Should clean up with reduce
         (#(loop [world %]
-            (if (contains? (:metadata world) :exit)
+            (if (finished? world)
               world
               (recur (step world)))))
         (apply-stage :tear-down)))
