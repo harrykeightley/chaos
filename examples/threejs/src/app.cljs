@@ -53,7 +53,7 @@
    :events :tick}
   (let [[rows cols] (:bounds resources)]
     (doseq [[cube [row col]] components]
-      (set! (.. cube -position -x) col)
+      (set! (.. cube -position -x) (-> (/ cols 2) - (+ col)))
       (set! (.. cube -position -y) (- rows row)))))
 
 (defsys reset-cubes

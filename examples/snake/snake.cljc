@@ -115,8 +115,11 @@
     [[:add [:components :food id] [:food]]
      [:add [:components :position id] [food-position]]]))
 
+(defn update-tick [x]
+  (max 100 (- x 5)))
+
 (defsys accelerate {:events :tick}
-  [[:update [:resource :timer] #(update % :ms dec)]])
+  [[:update [:resources :timer] #(update %1 :ms update-tick)]])
 
 (defsys display-game
   {:resources [:length :bounds]
