@@ -1,7 +1,7 @@
 {:deps {org.clojure/clojure      {:mvn/version "1.11.1"}
         org.clojure/core.async   {:mvn/version "1.6.681"}
         com.stuartsierra/dependency {:mvn/version "1.0.0"}}
- :paths ["src" "test"]
+ :paths ["src" "test" "resources"]
 
  :aliases {:repl/conjure
            {:extra-deps {nrepl/nrepl       {:mvn/version "0.9.0"}
